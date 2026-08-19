@@ -479,6 +479,7 @@ static int memlat_cpuhp_up(unsigned int cpu)
 			pr_err("set event %u on CPU %u fail: %d",
 			  cpu_grp->common_ev_ids[i],
 			  cpu, ret);
+                        ret = 0;
 			goto unlock_out;
 		}
 	}
@@ -496,6 +497,7 @@ static int memlat_cpuhp_up(unsigned int cpu)
 			pr_err("set event %u on CPU %u fail: %d",
 			  mon->miss_ev_id,
 			  cpu, ret);
+                        ret = 0;
 			goto unlock_out;
 		}
 	}

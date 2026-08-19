@@ -576,11 +576,12 @@ static int pago_cpu_up(unsigned int cpu)
 {
 	struct pago_cpu *data = &per_cpu(pago_cpu, cpu);
 	unsigned long flags;
+        int ret;
 
-	activate_pmu_events(data);
+        ret = activate_pmu_events(data);
 
 	raw_spin_lock_irqsave(&data->lock, flags);
-	data->cpu_up = true;
+        data->cpu_up = !ret;
 	raw_spin_unlock_irqrestore(&data->lock, flags);
 
 	trace_pago_data_snapshot(cpu, data->cpu_up, data->last_sampled,
