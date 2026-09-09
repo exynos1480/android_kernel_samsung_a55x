@@ -277,12 +277,14 @@ static int activate_pmu_events(struct pmu_data *data)
 
 	for (i = 0; i < NUM_OF_PMU_DATA; i++) {
 		pe_attr->config = pmu_event_id[i];
-		pe = exynos_perf_create_kernel_counter(pe_attr, data->cpu, NULL, NULL, NULL);
-		if (!pe) {
+
+		pe = perf_event_create_kernel_counter(pe_attr, data->cpu, NULL, NULL, NULL);
+		if (IS_ERR(pe)) {
 			pr_err("failed to create kernel perf event. CPU=%d\n", data->cpu);
 			kfree(pe_attr);
 			return -ENOMEM;
 		}
+		perf_event_enable(pe);
 		data->pe[i] = pe;
 	}
 

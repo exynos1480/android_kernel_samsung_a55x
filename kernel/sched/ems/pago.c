@@ -143,6 +143,9 @@ static u64 read_pmu_events(struct pago_cpu *data, int idx)
 {
 	u64 ret = 0;
 
+	if (WARN_ON_ONCE(!data->pe[idx]))
+		return 0;
+
 	perf_event_read_local(data->pe[idx], &ret, NULL, NULL);
 
 	return ret;
@@ -191,8 +194,10 @@ static int activate_pmu_events(struct pago_cpu *data)
 #endif
 		pe = exynos_perf_create_kernel_counter(pe_attr, data->cpu, NULL, NULL, NULL);
 		if (!pe) {
-			pr_err("failed to create kernel perf event. CPU=%d\n", data->cpu);
+			pr_err("failed to create kernel perf event. CPU=%d idx=%d config=0x%llx\n",
+				data->cpu, i, pe_attr->config);
 			kfree(pe_attr);
+			deactivate_pmu_events(data);
 			return -ENOMEM;
 		}
 
@@ -576,12 +581,17 @@ static int pago_cpu_up(unsigned int cpu)
 {
 	struct pago_cpu *data = &per_cpu(pago_cpu, cpu);
 	unsigned long flags;
-        int ret;
+	int ret;
 
-        ret = activate_pmu_events(data);
+	ret = activate_pmu_events(data);
+	if (ret) {
+		pr_err("%s: activate_pmu_events failed (%d), CPU=%d will not be marked up\n",
+			__func__, ret, cpu);
+		return ret;
+	}
 
 	raw_spin_lock_irqsave(&data->lock, flags);
-        data->cpu_up = !ret;
+	data->cpu_up = true;
 	raw_spin_unlock_irqrestore(&data->lock, flags);
 
 	trace_pago_data_snapshot(cpu, data->cpu_up, data->last_sampled,
@@ -1201,14 +1211,16 @@ static int pago_init_cpus(void)
 		}
 
 		data->cpu = cpu;
-		data->cpu_up = cpumask_test_cpu(cpu, cpu_online_mask);
 		data->enabled = true;
 		data->idle_sample = false;
 		data->last_sampled = 0;
 		data->last_updated = 0;
 		raw_spin_lock_init(&data->lock);
 
-		if (activate_pmu_events(data)) {
+		if (cpumask_test_cpu(cpu, cpu_online_mask) && !activate_pmu_events(data)) {
+			data->cpu_up = true;
+		} else {
+			data->cpu_up = false;
 			pr_err("%s: failed to enable pmu events. CPU=%d\n", __func__, cpu);
 		}
 

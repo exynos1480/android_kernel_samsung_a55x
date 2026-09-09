@@ -7696,10 +7696,11 @@ int ufshcd_try_to_abort_task(struct ufs_hba *hba, int tag)
 	}
 
 	if (is_mcq_enabled(hba) && ufshcd_eh_in_progress(hba)) {
-		if (!ufshcd_cmd_inflight(lrbp->cmd))
+		if (!ufshcd_cmd_inflight(lrbp->cmd)) {
 			dev_err(hba->dev, "%s: request is already complete. tag = %d, err %d\n",
 				__func__, tag, err);
 			goto out;
+		}
 	}
 
 	err = ufshcd_clear_cmd(hba, tag);

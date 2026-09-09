@@ -27,7 +27,8 @@ exynos_perf_create_kernel_counter(struct perf_event_attr *attr, int cpu,
 
 	event = perf_event_create_kernel_counter(attr, cpu, task, overflow_handler, context);
 	if (IS_ERR(event)) {
-		pr_err("failed to create kernel perf event");
+		pr_err("failed to create kernel perf event: config=0x%llx cpu=%d err=%ld (%pe)\n",
+			attr->config, cpu, PTR_ERR(event), event);
 		return NULL;
 	}
 
