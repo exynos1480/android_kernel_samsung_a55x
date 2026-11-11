@@ -1,0 +1,77 @@
+name: Kernel for a55x
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+
+    steps:
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL "$AGENT_TOOLSDIRECTORY" || true
+          sudo docker image prune --all --force || true
+          df -h
+
+      # Checkout build scripts
+      - name: Checkout build scripts
+        uses: actions/checkout@v4
+        with:
+          repository: fiqys/build-kernel
+          submodules: recursive
+          path: build-kernel
+          fetch-depth: 1
+
+      # Install dependencies
+      - name: Install build dependencies
+        run: |
+          sudo apt install -y \
+            build-essential bc bison flex libssl-dev libelf-dev \
+            device-tree-compiler kmod lz4 cpio python3 rsync \
+            git curl ca-certificates dwarves
+
+      # Checkout kernel
+      - name: Checkout kernel source
+        uses: actions/checkout@v4
+        with:
+          path: build-kernel/out/kernel
+          submodules: recursive
+          fetch-depth: 1
+
+      # Build kernel
+      - name: Build kernel
+        working-directory: build-kernel
+        run: |
+          source env.sh
+          scripts/build.sh --skip-vb a55x
+
+      # Generate tag
+      - name: Get build date
+        id: meta
+        run: echo "tag=ksun-$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+
+      # Upload outputs
+      - name: Upload files
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.tag }}
+          path: build-kernel/out/*.tar
+          retention-days: 14
+          if-no-files-found: warn
+
+      # Publish GitHub Release
+      - name: Publish release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: Kernel Build for a55x ${{ steps.meta.outputs.tag }}
+          files: build-kernel/out/*.tar
